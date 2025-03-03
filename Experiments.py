@@ -17,6 +17,14 @@ class Experiment_1:
         self.device = model_config['device']
         self.model_config = model_config
 
+        """Initialize the config for the procedure"""
+        self.test_t = [20, 50]
+
+        # None stands for unlimit
+        self.test_lim_i = 20 
+        self.train_lim_i = 80
+
+
         # Run
         self.df_anchor = self._procedure(model, sampler, trainer)
 
@@ -59,7 +67,7 @@ class Experiment_1:
             #for test_t in [0, 50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 950, 999]:
             #for test_t in [0, 5, 10, 15, 20, 25, 30, 35, 40, 50]:
             #for test_t in [0, 50, 100, 150, 200, 250, 300]:
-            for test_t in [20, 50]:
+            for test_t in self.test_t:
 
                 """
                 x_tilde_noise_map = []
