@@ -77,6 +77,7 @@ def train_new(args, reduced_sort_idx, modelConfig: Dict):
 
     # start training
     for e in range(1, modelConfig["epoch"]+1):
+        print(f"Training ...... Epoch : {e}")
         with tqdm(dataloader, dynamic_ncols=True) as tqdmDataLoader:
             for images, labels in tqdmDataLoader:
                 # train
