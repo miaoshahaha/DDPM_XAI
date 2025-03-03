@@ -13,6 +13,7 @@ from torch.nn import functional as F
 
 from Model import UNet, GaussianDiffusionSampler, GaussianDiffusionTrainer
 from Dataset import CUSTOM_DATASET
+from Config import set_config
 
 def seed_everything(seed=42):
     random.seed(seed)
@@ -758,19 +759,27 @@ class anchor_analysis:
         return df
     
 
-def model_init(args, model_config):
+def model_init(args, model_config, rd=False):
     """
+    Initiate the DDPM model, sampler. and trainer.
     Args:
-        args:
-        model_config: 
+        args: (Unused currently)
+        model_config: Containing model hyperparameters and configurations
+        rd: Passing the reduced model arguments
 
     Returns:
-        model:
-        sampler:
-        trainer:
+        model: DDPM model 
+        sampler: DDPM Gaussian diffusion sampler
+        trainer: DDPM trainer
     
     """
-    modelConfig = model_config
+    # Laod reduced model instead
+    if rd == True:
+        args.load_different_model = True
+
+
+    modelConfig = set_config(args)
+    print(f"loading model : {modelConfig["training_load_weight"]} ......")
 
     # Need CUDA to start 
     device = torch.device(modelConfig["device"])
@@ -801,6 +810,52 @@ def model_init(args, model_config):
     
     print("update Trainer ...... done")
 
+    args.load_different_model = False
+
     return model, sampler, trainer
 
 
+def create_reduce_idx(args, df):
+    df_is_train = df.copy()
+    df_anchor_is_train = df_is_train[df_is_train['is_train']==True]
+    df_anchor_is_train_mean = df_anchor_is_train.groupby(['idx'])[['scaled_ef_inversion','scaled_h']].mean().reset_index()
+    df_anchor_is_train_mean['weight'] = (df_anchor_is_train_mean['scaled_ef_inversion'] + df_anchor_is_train_mean['scaled_h']) / 2
+    
+    df_anchor_is_train_mean = df_anchor_is_train_mean.sort_values(by='weight')
+    reduced_sort_idx = np.array(df_anchor_is_train_mean['idx'])
+
+    return reduced_sort_idx
+
+def load_rd_model(args, modelConfig):
+    args.load_different_model = True
+    with torch.no_grad():
+        device = torch.device(modelConfig["device"])
+        model = UNet(T=modelConfig["T"], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], attn=modelConfig["attn"],
+                        num_res_blocks=modelConfig["num_res_blocks"], dropout=0.)
+
+        """Modify in different enviornment"""
+        ckpt = torch.load(os.path.join(
+            modelConfig["test_load_weight"]), map_location=device)
+        model.load_state_dict(ckpt)
+        print("model load weight done.")
+        model.eval()
+        sampler = GaussianDiffusionSampler(
+            model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"]).to(device)
+    
+    return model
+
+def generate_sameple_img(args, model_config, model, sampler):
+
+    """
+    Some bugs need to be fixed here :
+    sampling time became longer after training process.
+    after gc.collect() still doesn't work.
+    """
+    with torch.no_grad():
+        model.eval()
+        noisyImage = torch.randn(
+        size=[model_config["batch_size"], 3, 32, 32], device="cuda")
+        saveNoisy = torch.clamp(noisyImage * 0.5 + 0.5, 0, 1)
+        sampledImgs = sampler(noisyImage)
+
+    return sampledImgs
