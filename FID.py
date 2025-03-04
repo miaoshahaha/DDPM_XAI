@@ -28,7 +28,7 @@ from torchvision.utils import make_grid
 from torchvision.datasets import CIFAR10
 from torchvision import transforms
 import torchvision.utils as vutils
-from skimage.metrics import structural_similarity
+#from skimage.metrics import structural_similarity
 from sklearn import preprocessing
 
 #from __future__ import print_function

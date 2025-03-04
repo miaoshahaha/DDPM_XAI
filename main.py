@@ -20,7 +20,7 @@ if __name__ == '__main__':
         def __init__(self):
             self.seed = 5
             self.state = 'train'
-            self.epochs = 30 # training epochs
+            self.epochs = 10 # training epochs
             self.batch_size = 80
             self.dataset = 'MNIST'#'MNIST'#'CIFAR10' 
             self.split_class= [1]
@@ -56,19 +56,33 @@ if __name__ == '__main__':
     #h_info_sampledImgs = sampler.load_h_information()
     #xt_info_sampledImgs = sampler.load_xt_information()
 
+
+    
     expriment1 = Experiment_1(args, model_config, model, sampler, trainer)
     expriment1.plot_sim()
 
     df_anchor = expriment1.df_anchor
 
+    print("Experiment 1 Done ......")
+
+    exp2 = Experiment_2(args, model_config, df_anchor)
+    train_mean_anchor = exp2.anchor_train_mean_df
+    exp2.plot_sim()
+
+    print("experiment 2 Done ......")
+    
     # FID
+
     block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[2048]
     InceptionV3_model = InceptionV3([block_idx])
     InceptionV3_model=InceptionV3_model.cuda()
 
     # create indices
-    reduced_sort_idx = create_reduce_idx(args, df_anchor)
-    train_new(args, reduced_sort_idx, model_config)
+    reduced_sort_idx = create_reduce_idx(args, train_mean_anchor)
+    
+    for stage in (10):
+        for rd_mode in ['HIHE', 'Other', 'Random']:
+            train_new(args, reduced_sort_idx, model_config, stage, rd_mode)
 
     # load reduced model
     rd_model, rd_sampler, rd_trainer = model_init(args, model_config, rd=True)

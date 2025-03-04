@@ -1,4 +1,5 @@
 import os
+import numpy as np
 from typing import Dict
 
 import torch
@@ -20,7 +21,7 @@ def check_reduce():
     """
     return True
 
-def create_reduced_data(args, reduced_sort_idx, modelConfig):
+def create_reduced_data(args, reduced_sort_idx, modelConfig, reduce_mode, stage):
     """
     Reduces the training dataset by index selected.
     Args:
@@ -31,16 +32,31 @@ def create_reduced_data(args, reduced_sort_idx, modelConfig):
     Returns:
         Subset: A reduced training dataset.
     """
-    reduced_percentile = 0.1
+    
+    # Reduce percentage each stages
+    reduced_percentile = 0.04
 
     dt_train = CUSTOM_DATASET(args, split=True)
     train_dataset, _ = dt_train.load_dataset(custom_trasform=True)
-    HIHE_reduced_data = Subset(train_dataset, list(reduced_sort_idx[int(len(reduced_sort_idx)*reduced_percentile):]))
 
-    return HIHE_reduced_data
+    # Align the number of each group dataset
+    HIHE_len = len(reduced_sort_idx) * 0.5
+
+    #for round in range(10):
+    if reduce_mode == 'HIHE':
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[:int(HIHE_len*(1 - reduced_percentile * stage))]))
+    if reduce_mode == 'Other':
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[int(HIHE_len * (1 + reduced_percentile * stage)):]))
+    if reduce_mode == 'Random':
+        random_indices = np.random.choice(len(reduced_sort_idx), int(HIHE_len*(1 - reduced_percentile * stage)), replace=False)
+        random_indices_arr = reduced_sort_idx[random_indices]
+        reduced_data = Subset(train_dataset, random_indices_arr)
     
 
-def train_new(args, reduced_sort_idx, modelConfig: Dict):
+    return reduced_data
+    
+
+def train_new(args, reduced_sort_idx, modelConfig, stage, reduce_mode=None):
     """
     Trains a new DDPM model using the specified datasets and config.
     Args:
@@ -56,8 +72,8 @@ def train_new(args, reduced_sort_idx, modelConfig: Dict):
     train_dataset, test_dataset = dt.load_dataset()
 
     #Check if reducing the data
-    if check_reduce():
-        train_dataset = create_reduced_data(args, reduced_sort_idx, modelConfig)
+    if reduce_mode:
+        train_dataset = create_reduced_data(args, reduced_sort_idx, modelConfig, reduce_mode, stage)
     
     dataloader = DataLoader(
         train_dataset, batch_size=modelConfig["batch_size"], shuffle=True, num_workers=4, drop_last=True, pin_memory=True)
@@ -77,6 +93,7 @@ def train_new(args, reduced_sort_idx, modelConfig: Dict):
 
     # start training
     for e in range(1, modelConfig["epoch"]+1):
+        print(f"Training ...... Epoch : {e}")
         with tqdm(dataloader, dynamic_ncols=True) as tqdmDataLoader:
             for images, labels in tqdmDataLoader:
                 # train
@@ -99,9 +116,9 @@ def train_new(args, reduced_sort_idx, modelConfig: Dict):
             #os.mkdir(modelConfig["save_weight_dir"])
 
         """Modify in different enviornment"""
-        if e > modelConfig["epoch"] - 5 or e % 10 == 0:
+        if e > modelConfig["epoch"] - 1:
             torch.save(net_model.state_dict(), os.path.join(
-            modelConfig["save_weight_dir"], f'rd{int(args.rd * 100)}_c{args.split_class[0]}_ckpt_{e}_.pt'))
+            modelConfig["save_weight_dir"], f'{reduce_mode}_rd{int(args.rd * 100)}_c{args.split_class[0]}_ckpt_{e}_.pt'))
 
 
 def evaluate(args, modelConfig: Dict):

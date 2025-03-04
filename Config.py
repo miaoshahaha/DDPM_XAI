@@ -39,6 +39,7 @@ def set_config(args, custom_dataset="haha"):
         "device": "cuda:0", ### MAKE SURE YOU HAVE A GPU !!!
         "training_load_weight": training_load_weight,
         "save_weight_dir": f"{str(args.save_weight_dir)}",#'/kaggle/input/mnist-interference',#'/kaggle/input/cifar10',
+        "load_weight_dir": f"{str(args.save_weight_dir)}",#'/kaggle/input/mnist-interference',#'/kaggle/input/cifar10',
         "test_load_weight": test_load_weight,
         "sampled_dir": args.sample_dir + args.dataset +"/",
         "sampledNoisyImgName": f"NoisyNoGuidenceImgs{args.load_training_checkpoint+args.epochs}.png",

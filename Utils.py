@@ -189,6 +189,10 @@ def directory_init():
     os.makedirs(res_dir + '/CheckpointsImagenet', exist_ok=True)
     os.makedirs(res_dir + '/CheckpointsCIFAR10', exist_ok=True)
     
+    os.makedirs(res_dir + '/ResultsMNIST', exist_ok=True)
+    os.makedirs(res_dir + '/ResultsImagenet', exist_ok=True)
+    os.makedirs(res_dir + '/ResultsCIFAR10', exist_ok=True)
+    
     #os.makedirs(res_dir + '/SampledImgsMNIST', exist_ok=True)
     #os.makedirs(res_dir + '/SampledImgsImagenet', exist_ok=True)
     #os.makedirs(res_dir + '/SampledImgsCIFAR10', exist_ok=True)
@@ -779,7 +783,7 @@ def model_init(args, model_config, rd=False):
 
 
     modelConfig = set_config(args)
-    print(f"loading model : {modelConfig["training_load_weight"]} ......")
+    print(f"loading model : {modelConfig['training_load_weight']} ......")
 
     # Need CUDA to start 
     device = torch.device(modelConfig["device"])
@@ -793,7 +797,7 @@ def model_init(args, model_config, rd=False):
                     num_res_blocks=modelConfig["num_res_blocks"], dropout=0.)
     
     ckpt = torch.load(os.path.join(
-    modelConfig["save_weight_dir"], modelConfig["test_load_weight"]), map_location=device)
+    modelConfig["load_weight_dir"], modelConfig["test_load_weight"]), map_location=device)
 
     model.load_state_dict(ckpt)
 
@@ -815,14 +819,14 @@ def model_init(args, model_config, rd=False):
     return model, sampler, trainer
 
 
-def create_reduce_idx(args, df):
-    df_is_train = df.copy()
-    df_anchor_is_train = df_is_train[df_is_train['is_train']==True]
-    df_anchor_is_train_mean = df_anchor_is_train.groupby(['idx'])[['scaled_ef_inversion','scaled_h']].mean().reset_index()
-    df_anchor_is_train_mean['weight'] = (df_anchor_is_train_mean['scaled_ef_inversion'] + df_anchor_is_train_mean['scaled_h']) / 2
+def create_reduce_idx(args, df, e_w=0.2, i_w=0.8):
+    df_copy = df.copy()
+    #df_anchor_is_train = df_is_train[df_is_train['is_train']==True]
+    df_anchor_mean = df_copy.groupby(['idx'])[['scaled_ef_inversion','scaled_h']].mean().reset_index()
+    df_anchor_mean['weight'] = (df_anchor_mean['scaled_ef_inversion'] * e_w + df_anchor_mean['scaled_h'] * i_w)
     
-    df_anchor_is_train_mean = df_anchor_is_train_mean.sort_values(by='weight')
-    reduced_sort_idx = np.array(df_anchor_is_train_mean['idx'])
+    df_anchor_mean = df_anchor_mean.sort_values(by='weight')
+    reduced_sort_idx = np.array(df_anchor_mean['idx'])
 
     return reduced_sort_idx
 
@@ -842,7 +846,7 @@ def load_rd_model(args, modelConfig):
         sampler = GaussianDiffusionSampler(
             model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"]).to(device)
     
-    return model
+    return model, sampler
 
 def generate_sameple_img(args, model_config, model, sampler):
 
