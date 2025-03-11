@@ -38,17 +38,20 @@ def create_reduced_data(args, reduced_sort_idx, modelConfig, reduce_mode, stage)
 
     dt_train = CUSTOM_DATASET(args, split=True)
     train_dataset, _ = dt_train.load_dataset(custom_trasform=True)
+    
 
     # Align the number of each group dataset
-    HIHE_len = len(reduced_sort_idx) * 0.5
+    HIHE_len = len(reduced_sort_idx) * 0.35
+    subset_size = int(HIHE_len * (1 - reduced_percentile * stage))  # Ensure the same size for all modes
+
 
     #for round in range(10):
     if reduce_mode == 'HIHE':
-        reduced_data = Subset(train_dataset, list(reduced_sort_idx[:int(HIHE_len*(1 - reduced_percentile * stage))]))
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[:subset_size]))
     if reduce_mode == 'Other':
-        reduced_data = Subset(train_dataset, list(reduced_sort_idx[int(HIHE_len * (1 + reduced_percentile * stage)):]))
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[-subset_size:]))
     if reduce_mode == 'Random':
-        random_indices = np.random.choice(len(reduced_sort_idx), int(HIHE_len*(1 - reduced_percentile * stage)), replace=False)
+        random_indices = np.random.choice(len(reduced_sort_idx), subset_size, replace=False)
         random_indices_arr = reduced_sort_idx[random_indices]
         reduced_data = Subset(train_dataset, random_indices_arr)
     
@@ -118,7 +121,7 @@ def train_new(args, reduced_sort_idx, modelConfig, stage, reduce_mode=None):
         """Modify in different enviornment"""
         if e > modelConfig["epoch"] - 1:
             torch.save(net_model.state_dict(), os.path.join(
-            modelConfig["save_weight_dir"], f'{reduce_mode}_rd{int(args.rd * 100)}_c{args.split_class[0]}_ckpt_{e}_.pt'))
+            modelConfig["save_weight_dir"], f'{reduce_mode}_rd{int(args.rd * stage * 100)}_c{args.split_class[0]}_ckpt_{e}_.pt'))
 
 
 def evaluate(args, modelConfig: Dict):

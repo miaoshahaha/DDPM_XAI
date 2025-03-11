@@ -33,6 +33,9 @@ class Experiment_1:
         print("Create anchor dataframe Done ......")
 
     def _procedure(self, model, sampler, trainer, training_anchor_num=10, testing_anchor_num=10):
+        """
+        Still need some improvment for divided extrinsic and intrinsic 't'
+        """
         data_idx = []
         label_lst = []
         ef_inversion_lst = []
@@ -50,6 +53,10 @@ class Experiment_1:
         betas = trainer.betas
         alpha_t = 1.0 - betas
         alpha_cumprod = torch.cumprod(alpha_t, dim=0)
+        
+        #Function for adjusting weight to applying time step
+        test_t_ext_w = 0.05
+        test_t_int_w = 1
 
         with torch.no_grad():
             model.eval()
@@ -68,6 +75,8 @@ class Experiment_1:
 
         with torch.no_grad():
             for test_t in self.test_t:
+                test_t_ext = int(test_t * test_t_ext_w)
+                test_t_int = int(test_t * test_t_int_w) 
 
                 """
                 x_tilde_noise_map = []
@@ -97,10 +106,10 @@ class Experiment_1:
                 
                 for i in range(len(x_tilde_0)):
                     x_0_train = x_tilde_0[i].to(self.device)
-                    ef_inversion_val = edit_friendly_inversion(x_0_train, test_t, alpha_cumprod, model, sampler)
+                    ef_inversion_val = edit_friendly_inversion(x_0_train, test_t_ext, alpha_cumprod, model, sampler)
                 
                     # h space
-                    base_n_t_h = x_0_train.new_ones([1, ], dtype=torch.long) * test_t
+                    base_n_t_h = x_0_train.new_ones([1, ], dtype=torch.long) * test_t_int
                     h_train = model(x_0_train.unsqueeze(dim=0), base_n_t_h)
                     
                     # append 
@@ -116,7 +125,7 @@ class Experiment_1:
                     x_0 = test_dataset[i][0].to(self.device)
                     #x_tilde_t = trainer.get_step_xt(x_tilde_0, test_t)
                     #timesteps = list(range(1000))
-                    ef_inversion_val = edit_friendly_inversion(x_0, test_t, alpha_cumprod, model, sampler)
+                    ef_inversion_val = edit_friendly_inversion(x_0, test_t_ext, alpha_cumprod, model, sampler)
 
                     h_test = model(x_0.unsqueeze(dim=0), base_n_t_h)
                     
@@ -164,7 +173,7 @@ class Experiment_1:
                     x_0 = train_dataset[i][0].to(self.device)
                     #x_tilde_t = trainer.get_step_xt(x_tilde_0, test_t)
                     #timesteps = list(range(1000))
-                    ef_inversion_val = edit_friendly_inversion(x_0, test_t, alpha_cumprod, model, sampler)
+                    ef_inversion_val = edit_friendly_inversion(x_0, test_t_ext, alpha_cumprod, model, sampler)
 
                     h_test = model(x_0.unsqueeze(dim=0), base_n_t_h)
                     
