@@ -55,7 +55,7 @@ class Experiment_1:
         alpha_cumprod = torch.cumprod(alpha_t, dim=0)
         
         #Function for adjusting weight to applying time step
-        test_t_ext_w = 0.05
+        test_t_ext_w = 0
         test_t_int_w = 1
 
         with torch.no_grad():
@@ -246,23 +246,35 @@ class Experiment_1:
 
         sns.lineplot(ax=axes[0], data=self.df_anchor, x='t',y='scaled_ef_inversion',hue='label', hue_order=hue_order, palette=palette)
         axes[0].legend(loc='upper left', bbox_to_anchor=(1, 1))  # Moves the legend to the right
-        axes[0].set_title(f'ef_inversion at each timestep{self.args.dataset,self.args.split_class}')
+        axes[0].set_title(f'Extrinsic at each timestep{self.args.dataset,self.args.split_class}')
         plt.savefig(f'Result/Results{self.args.dataset}/ef_inversion_{self.args.dataset}_{self.args.split_class}.png')
 
         sns.lineplot(ax=axes[1], data=self.df_anchor, x='t',y='scaled_h',hue='label', hue_order=hue_order, palette=palette)
         axes[1].legend(loc='upper left', bbox_to_anchor=(1, 1))  # Moves the legend to the right
-        axes[1].set_title(f'scaled_h at each timestep{self.args.dataset,self.args.split_class}')
+        axes[1].set_title(f'Intrinsic at each timestep{self.args.dataset,self.args.split_class}')
         plt.savefig(f'Result/Results{self.args.dataset}/scaled_h_{self.args.dataset}_{self.args.split_class}.png')
 
 
 class Experiment_2:
     """Calculate Frechet Distance"""
-    def __init__(self, args, model_config, experiment_1_df):
+    def __init__(self, args, model_config, experiment_1_df, metric):
         self.args = args
+        self.metric = metric
+        self.exp1_df = experiment_1_df.copy()
         df_istrain = experiment_1_df[experiment_1_df['is_train'] == True]
         df_istest = experiment_1_df[experiment_1_df['is_train'] == False]
-        self.anchor_train_mean_df = self._calc_asc_weight_df(df_istrain, df_istrain)
-        self.anchor_test_mean_df = self._calc_asc_weight_df(df_istest, df_istrain)
+        
+        (
+            self.anchor_train_mean_df,
+            self.i_mean,
+            self.i_var,
+            self.e_mean,
+            self.e_var
+        ) = self._calc_asc_weight_df(df_istrain, df_istrain, metric=metric)
+        
+        self.anchor_test_mean_df, _, _, _, _ = self._calc_asc_weight_df(df_istest, df_istrain,metric=metric)
+        
+   
     
     def plot_sim(self):
         args = self.args
@@ -280,8 +292,8 @@ class Experiment_2:
 
         sns.boxplot(ax=axes[0], data=concat_df, x='label',y='fd_h', hue_order=hue_order, palette=palette, order=hue_order)
         axes[0].legend(loc='upper left', bbox_to_anchor=(1, 1))  # Moves the legend to the right
-        axes[0].set_title(f'Fréchet distance of scaled h{args.dataset,args.split_class}')
-        plt.savefig(f'Result/Results{self.args.dataset}/fd_h_{self.args.dataset}_{self.args.split_class}.png')
+        axes[0].set_title(f'{self.metric} distance of scaled intrinsic{args.dataset,args.split_class}')
+        plt.savefig(f'Result/Results{self.args.dataset}/{self.metric}_h_{self.args.dataset}_{self.args.split_class}.png')
 
 
         #hue_order = ['0','1','2','3','4','5','6','7','8','9']
@@ -289,16 +301,16 @@ class Experiment_2:
 
         sns.boxplot(ax=axes[1], data=concat_df, x='label',y='fd_ef', hue_order=hue_order, palette=palette, order=hue_order)
         axes[1].legend(loc='upper left', bbox_to_anchor=(1, 1))  # Moves the legend to the right
-        axes[1].set_title(f'Fréchet distance of scaled extrinsic{args.dataset,args.split_class}')
-        plt.savefig(f'Result/Results{self.args.dataset}/fd_ex_{self.args.dataset}_{self.args.split_class}.png')
+        axes[1].set_title(f'{self.metric} distance of scaled extrinsic{args.dataset,args.split_class}')
+        plt.savefig(f'Result/Results{self.args.dataset}/{self.metric}_ex_{self.args.dataset}_{self.args.split_class}.png')
 
         sns.scatterplot(data=concat_df, x="fd_ef", y="fd_h", hue="label", palette=palette)
         axes[2].legend(loc='upper left', bbox_to_anchor=(1, 1))  # Moves the legend to the right
         axes[2].set_title(f'Quadrant plot of anchor {args.dataset,args.split_class}')
-        plt.savefig(f'Result/Results{self.args.dataset}/scatter_plot_quadrant_{self.args.dataset}_{self.args.split_class}.png')
+        plt.savefig(f'Result/Results{self.args.dataset}/scatter_plot_{self.metric}_{self.args.dataset}_{self.args.split_class}.png')
 
         
-    def _calc_asc_weight_df(self, input_df, compared_df, set_compare_num=80):
+    def _calc_asc_weight_df(self, input_df, compared_df, set_compare_num=80, metric='L2'):
         fd_h_lst = []
         fd_ef_lst = []
         label_lst = []
@@ -327,20 +339,51 @@ class Experiment_2:
                 compare_h_Q = np.vstack([compare_t, is_train_j_h_arr]).T
                 compare_ef_Q = np.vstack([compare_t, is_train_j_ef_arr]).T
                 
-                fd_h += self._frechet_distance(compare_h_P, compare_h_Q) / set_compare_num
-                fd_ef += self._frechet_distance(compare_ef_P, compare_ef_Q) / set_compare_num
+                fd_h += self._distance_metric(compare_h_P, compare_h_Q, metric=metric) / set_compare_num
+                fd_ef += self._distance_metric(compare_ef_P, compare_ef_Q, metric=metric) / set_compare_num
 
 
             fd_h_lst.append(fd_h)
             fd_ef_lst.append(fd_ef)
             label_lst.append(input_df.iloc[i].label)
+            
+        i_star = np.argmin(fd_h_lst)
+        self._save_i_starImg(i_star)
+         #calculate training data
+        for i in [i_star]:
+            i_star_i = []
+            i_star_e = []
+
+            df_istrain_i = input_df[input_df['idx']==i]
+            is_train_i_h_arr = np.array(df_istrain_i['scaled_h'])
+            is_train_i_ef_arr = np.array(df_istrain_i['scaled_ef_inversion'])
+            compare_h_P = np.vstack([compare_t, is_train_i_h_arr]).T
+            compare_ef_P = np.vstack([compare_t, is_train_i_ef_arr]).T
+
+            for counter, j in enumerate(compared_df['idx'].unique()):
+                if counter > set_compare_num:
+                    break
+                
+                df_istrain_j = compared_df[compared_df['idx']==j]
+                is_train_j_h_arr = np.array(df_istrain_j['scaled_h'])
+                is_train_j_ef_arr = np.array(df_istrain_j['scaled_ef_inversion'])
+                compare_h_Q = np.vstack([compare_t, is_train_j_h_arr]).T
+                compare_ef_Q = np.vstack([compare_t, is_train_j_ef_arr]).T
+                
+                i_star_i.append(self._distance_metric(compare_h_P, compare_h_Q, metric=metric))
+                i_star_e.append(self._distance_metric(compare_ef_P, compare_ef_Q, metric=metric))
+        
+        i_mean = np.mean(i_star_i)
+        i_var = np.var(i_star_i)
+        e_mean = np.mean(i_star_e)
+        e_var = np.var(i_star_e)
 
         input_df_mean = input_df.groupby(['idx','label'])[['scaled_h','scaled_ef_inversion']].mean().reset_index()
         fd_df = pd.DataFrame([fd_h_lst, fd_ef_lst]).T
         fd_df.columns = ['fd_h','fd_ef']
         anchor_mean_df = pd.concat([input_df_mean,fd_df],axis=1)
 
-        return anchor_mean_df
+        return anchor_mean_df, i_mean, i_var, e_mean, e_var
 
     def _euclidean(self, p1, p2):
         return np.linalg.norm(np.array(p1) - np.array(p2))
@@ -366,3 +409,101 @@ class Experiment_2:
     def _frechet_distance(self, P, Q):
         ca = np.ones((len(P), len(Q))) * -1
         return self._frechet_recursive(ca, P, Q, len(P)-1, len(Q)-1)
+    
+    def _distance_metric(self, P, Q, metric):
+        """
+        Compute the distance between two sequences using various distance metrics.
+
+        Parameters:
+            P (np.array): First sequence
+            Q (np.array): Second sequence
+            metric (str): The distance metric to use. Options:
+                        - 'L1' (Manhattan Distance)
+                        - 'L2' (Euclidean Distance)
+                        - 'Linf' (Chebyshev Distance)
+                        - 'Frechet' (Frechet Distance)
+
+        Returns:
+            float: Computed distance
+        """
+        P, Q = np.array(P), np.array(Q)  # Ensure NumPy arrays
+        
+        if metric == 'L1':  # Manhattan Distance
+            return np.sum(np.abs(P - Q))
+        
+        elif metric == 'L2':  # Euclidean Distance
+            return np.sqrt(np.sum((P - Q) ** 2))
+        
+        elif metric == 'Linf':  # Chebyshev Distance (Maximum Norm)
+            return np.max(np.abs(P - Q))
+        
+        elif metric == 'Frechet':  # Frechet Distance (assuming implemented)
+            return self._frechet_distance(P, Q)
+        
+        else:
+            raise ValueError(f"Unknown metric: {metric}. Choose from 'L1', 'L2', 'Linf', or 'Frechet'.")
+    
+    def _save_i_starImg(self, i_star):
+        dt_train = CUSTOM_DATASET(self.args, split=True)
+        train_dataset, _ = dt_train.load_dataset(custom_trasform=True)
+        #plt.imshow(train_dataset[i_star][0].permute(1,2,0))
+        #plt.savefig(f'Result/Results{self.args.dataset}/istar_{self.args.metric}_{self.args.dataset}_{self.args.split_class}.png')
+
+
+class Experiment_3:
+    def __init__(self, args, model_config, exp_train_df, exp_test_df):
+        self.args = args
+        self.df_train = exp_train_df.copy()
+        self.df_test = exp_test_df.copy()
+        
+    def plot(self, KDE_plot=False):
+        self._procedure(self.df_train, self.df_test, KDE_plot)  
+        
+    def _procedure(self, df_train, df_test, KDE_plot):
+        # Define the palette
+        args = self.args
+        
+        palette = {
+            str(i): 'red' if str(i) == str(args.split_class[0]) else 'grey'
+            for i in range(10)
+        }
+        palette['train'] = 'blue'  # Adding 'train' key separately
+
+        hue_order = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'train']
+
+        # Concatenating DataFrames
+        concat_df = pd.concat([df_train, df_test], axis=0).reset_index()
+        concat_df['w'] = concat_df['fd_h'] * 0.5 + concat_df['fd_ef'] * 0.5
+
+        # Create subplots
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6))
+
+        # Boxplot
+        sns.boxplot(ax=axes[0], data=concat_df, x='label', y='w', hue='label', order=hue_order, palette=palette)
+        axes[0].set_title(f'Distance of data {args.dataset, args.split_class}')
+        handles, labels = axes[0].get_legend_handles_labels()
+        axes[0].legend(handles, labels, title="Label", loc='upper left', bbox_to_anchor=(1, 1))  # Moves legend to the right
+
+        # Histogram
+        if KDE_plot:
+            ax = sns.kdeplot(data=concat_df, x="w", hue='label', palette=palette)
+
+            handles, labels = ax.get_legend_handles_labels()
+            plt.title("Distribution of scaled_h for each label")
+            plt.xlabel("scaled_h")
+            plt.ylabel("Count")
+            ax.legend(handles, labels, title="Label", loc='upper left', bbox_to_anchor=(1, 1))
+            plt.show()
+        else:
+            sns.histplot(ax=axes[1], data=concat_df, x="w", hue="label", kde=True, bins=20, palette=palette)
+            handles, labels = axes[1].get_legend_handles_labels()
+            axes[1].legend(handles, labels, title="Label", loc='upper right')  # Adjust legend position
+            axes[1].set_title("Distribution for each label")
+
+            # Adjust labels
+            axes[1].set_xlabel("scaled_h")
+            axes[1].set_ylabel("Count")
+            
+        plt.savefig(f'Result/Results{self.args.dataset}/distribution_{self.args.metric}_{self.args.dataset}_{self.args.split_class}.png')
+        plt.tight_layout()
+        plt.show()

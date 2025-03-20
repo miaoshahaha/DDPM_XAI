@@ -42,16 +42,16 @@ def create_reduced_data(args, reduced_sort_idx, modelConfig, reduce_mode, stage)
 
     # Align the number of each group dataset
     HIHE_len = len(reduced_sort_idx) * 0.35
-    subset_size = int(HIHE_len * (1 - reduced_percentile * stage))  # Ensure the same size for all modes
+    subset_size = int(HIHE_len * (reduced_percentile * stage))  # Ensure the same size for all modes
 
 
     #for round in range(10):
     if reduce_mode == 'HIHE':
-        reduced_data = Subset(train_dataset, list(reduced_sort_idx[:subset_size]))
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[subset_size:]))
     if reduce_mode == 'Other':
-        reduced_data = Subset(train_dataset, list(reduced_sort_idx[-subset_size:]))
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[:int(args.training_anchor_num - subset_size)]))
     if reduce_mode == 'Random':
-        random_indices = np.random.choice(len(reduced_sort_idx), subset_size, replace=False)
+        random_indices = np.random.choice(len(reduced_sort_idx), int(args.training_anchor_num - subset_size))
         random_indices_arr = reduced_sort_idx[random_indices]
         reduced_data = Subset(train_dataset, random_indices_arr)
     
