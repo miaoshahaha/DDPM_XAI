@@ -11,7 +11,7 @@ def set_config(args, custom_dataset="haha"):
         training_load_weight = f"rd{int(args.rd * 100)}_c{args.split_class[0]}_ckpt_{args.load_rd_training_checkpoint}_.pt"
         test_load_weight = f"rd{int(args.rd * 100)}_c{args.split_class[0]}_ckpt_{args.load_rd_training_checkpoint}_.pt"
     else:
-        training_load_weight = f"{str(args.split_class[0])}_ckpt_{args.load_training_checkpoint}_.pt"
+        training_load_weight = f"c{str(args.split_class[0])}_ckpt_{args.load_training_checkpoint}_.pt"
         test_load_weight = f"c{str(args.split_class[0])}_ckpt_{args.load_training_checkpoint}_.pt"
     
     #print(f"training_load_weight : {training_load_weight}")
