@@ -175,7 +175,8 @@ class GaussianDiffusionSampler(nn.Module):
                 """
                 Maybe try no clipping when saving into h space. 
                 """
-                print(f'Timestep {time_step} add to h space information and xt information.')
+                """shut up"""
+                #print(f'Timestep {time_step} add to h space information and xt information.')
             
         x_0 = x_t
         
