@@ -42,16 +42,16 @@ def create_reduced_data(args, reduced_sort_idx, modelConfig, reduce_mode, stage)
 
     # Align the number of each group dataset
     HIHE_len = len(reduced_sort_idx) * 0.35
-    subset_size = int(HIHE_len * (1 - reduced_percentile * stage))  # Ensure the same size for all modes
+    subset_size = int(HIHE_len * (reduced_percentile * stage))  # Ensure the same size for all modes
 
 
     #for round in range(10):
     if reduce_mode == 'HIHE':
-        reduced_data = Subset(train_dataset, list(reduced_sort_idx[:subset_size]))
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[subset_size:]))
     if reduce_mode == 'Other':
-        reduced_data = Subset(train_dataset, list(reduced_sort_idx[-subset_size:]))
+        reduced_data = Subset(train_dataset, list(reduced_sort_idx[:int(args.training_anchor_num - subset_size)]))
     if reduce_mode == 'Random':
-        random_indices = np.random.choice(len(reduced_sort_idx), subset_size, replace=False)
+        random_indices = np.random.choice(len(reduced_sort_idx), int(args.training_anchor_num - subset_size))
         random_indices_arr = reduced_sort_idx[random_indices]
         reduced_data = Subset(train_dataset, random_indices_arr)
     
@@ -85,6 +85,13 @@ def train_new(args, reduced_sort_idx, modelConfig, stage, reduce_mode=None):
     net_model = UNet(T=modelConfig["T"], ch=modelConfig["channel"], ch_mult=modelConfig["channel_mult"], attn=modelConfig["attn"],
                      num_res_blocks=modelConfig["num_res_blocks"], dropout=modelConfig["dropout"]).to(device)
     
+    if args.load_trained_model:
+        ckpt = torch.load(os.path.join(
+        modelConfig["load_weight_dir"], modelConfig["test_load_weight"]), map_location=device)
+        
+        net_model.load_state_dict(ckpt)
+
+
     optimizer = torch.optim.AdamW(
         net_model.parameters(), lr=modelConfig["lr"], weight_decay=1e-4)
     cosineScheduler = optim.lr_scheduler.CosineAnnealingLR(
@@ -93,6 +100,7 @@ def train_new(args, reduced_sort_idx, modelConfig, stage, reduce_mode=None):
         optimizer=optimizer, multiplier=modelConfig["multiplier"], warm_epoch=modelConfig["epoch"] // 10, after_scheduler=cosineScheduler)
     trainer = GaussianDiffusionTrainer(
         net_model, modelConfig["beta_1"], modelConfig["beta_T"], modelConfig["T"]).to(device)
+            
 
     # start training
     for e in range(1, modelConfig["epoch"]+1):
@@ -119,9 +127,9 @@ def train_new(args, reduced_sort_idx, modelConfig, stage, reduce_mode=None):
             #os.mkdir(modelConfig["save_weight_dir"])
 
         """Modify in different enviornment"""
-        if e > modelConfig["epoch"] - 1:
+        if e % 500 == 0 or e > modelConfig["epoch"] - 1:
             torch.save(net_model.state_dict(), os.path.join(
-            modelConfig["save_weight_dir"], f'{reduce_mode}_rd{int(args.rd * stage * 100)}_c{args.split_class[0]}_ckpt_{e}_.pt'))
+            modelConfig["save_weight_dir"], f'c{args.split_class[0]}_ckpt_{e}_.pt'))
 
 
 def evaluate(args, modelConfig: Dict):
@@ -140,7 +148,8 @@ def evaluate(args, modelConfig: Dict):
 
         """Modify in different enviornment"""
         ckpt = torch.load(os.path.join(
-            modelConfig["test_load_weight"]), map_location=device)
+        modelConfig["load_weight_dir"], modelConfig["test_load_weight"]), map_location=device)
+
         model.load_state_dict(ckpt)
         print("model load weight done.")
         model.eval()

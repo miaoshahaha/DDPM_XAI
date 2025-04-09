@@ -32,13 +32,13 @@ class CUSTOM_DATASET:
                 ])
             
             Imagenet_DatasetTransform = transforms.Compose([
-                transforms.Resize((64,64)),
-                transforms.CenterCrop((52,52)),
-                transforms.Resize((64,64)),
+                transforms.Resize((32,32)),
+                transforms.CenterCrop((26,26)),
+                transforms.Resize((32,32)),
                 transforms.RandomHorizontalFlip(p=0.5),
                 transforms.ToTensor(),
-                #transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                #transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
                 ])
         else:
             CIFAR10_DatasetTransform = transforms.Compose([
@@ -66,8 +66,8 @@ class CUSTOM_DATASET:
             test_dataset = CIFAR10(root='./CIFAR10_ds', train=False, download=True, transform=CIFAR10_DatasetTransform)
 
         elif self.curr_dataset == 'Imagenet':
-            train_dataset = torchvision.datasets.ImageFolder(root='tiny-imagenet/train', transform=Imagenet_DatasetTransform)
-            test_dataset = torchvision.datasets.ImageFolder(root='tiny-imagenet/val', transform=Imagenet_DatasetTransform)
+            train_dataset = torchvision.datasets.ImageFolder(root='Imagenet/train', transform=Imagenet_DatasetTransform)
+            test_dataset = torchvision.datasets.ImageFolder(root='Imagenet/val', transform=Imagenet_DatasetTransform)
 
         #elif self.curr_dataset == 'CelebA':
             #train_dataset = torchvision.datasets.ImageFolder(root='celeba/train', transform=DatasetTransform)
