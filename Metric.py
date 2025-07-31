@@ -135,11 +135,6 @@ def compute_x_tilde_and_x(x_tilde_0, x_0, t, model, sampler, trainer, noise_cal=
             mse_loss = nn.MSELoss()
             mse_diff += compute_edit_distance(x_t_from_forward, x_tilde_t_from_forward[i], metric)
     
-            #base_n_t_h = x_t_from_forward.new_ones([1, ], dtype=torch.long) * t
-            #h_tilde_t = model.get_h_space(x_tilde_t_from_forward[i].unsqueeze(dim=0), base_n_t_h)
-            #h_t = model.get_h_space(x_0.unsqueeze(dim=0), base_n_t_h)
-            #h_loss = nn.MSELoss()
-    
             # h
             h_diff += compute_edit_distance(h_t, h_tilde_t[i], metric)
     

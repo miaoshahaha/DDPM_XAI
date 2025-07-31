@@ -240,7 +240,12 @@ class Experiment_1:
         palette['train'] = 'blue'  # Adding 'train' key separately
 
         #hue_order = ['0','1','2','3','4','5','6','7','8','9']
-        hue_order = ['0','1','2','3','4','5','6','7','8','9','train']
+        #hue_order = ['0','1','2','3','4','5','6','7','8','9','train']
+        self.df_anchor['label'] = self.df_anchor['label'].apply(
+        lambda x: 'other' if x in ['0','2','3','4','5','6','7','8','9'] else x
+    )
+        hue_order = ['0','other','train']
+
 
         fig, axes = plt.subplots(2, 1, figsize=(6, 12))  # Adjust figure size as needed
 
@@ -430,7 +435,7 @@ class Experiment_2:
 
         Returns:
             float: Computed distance
-        """
+        """ 
         P, Q = np.array(P), np.array(Q)  # Ensure NumPy arrays
         
         if metric == 'L1':  # Manhattan Distance
